@@ -4,10 +4,10 @@
 /node_modules
 /.pnp
 .pnp.js
-
+app/__pycache__
 # testing
 /coverage
-
+/venv
 # next.js
 /.next/
 /out/
