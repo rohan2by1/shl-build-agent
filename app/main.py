@@ -1,36 +1,37 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware  # <-- ADD THIS
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from app.schemas import ChatRequest, ChatResponse
 from app.retriever import CatalogRetriever
 from app.agent import SHLAgent
 
-# Global application state
 app_state = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Load the catalog and initialize the agent once
-    print("Initializing Vector DB and Agent...")
+    print("Connecting to Vector DB and Agent...")
     retriever = CatalogRetriever()
     agent = SHLAgent(retriever=retriever)
     
     app_state["agent"] = agent
     print("Application ready.")
     yield
-    # Shutdown logic can go here if needed
     app_state.clear()
 
 app = FastAPI(title="SHL Agentic Recommender", lifespan=lifespan)
-# --- ADD THIS CORS BLOCK ---
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (good for local testing)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ---------------------------
+
+@app.get("/", response_class=FileResponse)
+async def serve_ui():
+    return FileResponse("index.html")
 
 @app.get("/health")
 async def health_check():

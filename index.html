@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHL Agent Tester</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .chat-container { width: 100%; max-width: 600px; height: 90vh; background-color: #2d2d2d; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .header { background-color: #3e3e42; padding: 15px 20px; font-weight: bold; font-size: 18px; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center;}
+        .status { font-size: 12px; color: #4caf50; display: flex; align-items: center; gap: 5px;}
+        .status-dot { width: 8px; height: 8px; background-color: #4caf50; border-radius: 50%; }
+        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 8px; line-height: 1.4; word-wrap: break-word; }
+        .message.user { align-self: flex-end; background-color: #007acc; color: white; border-bottom-right-radius: 2px; }
+        .message.agent { align-self: flex-start; background-color: #3e3e42; color: #e1e1e1; border-bottom-left-radius: 2px; }
+        .recommendations { margin-top: 10px; padding: 10px; background: #1e1e1e; border-radius: 6px; font-size: 14px; border: 1px solid #555; }
+        .rec-item { margin-bottom: 8px; }
+        .rec-item a { color: #4ebfff; text-decoration: none; }
+        .rec-item a:hover { text-decoration: underline; }
+        .input-area { display: flex; padding: 15px; background-color: #3e3e42; border-top: 1px solid #1e1e1e; }
+        input[type="text"] { flex: 1; padding: 12px; border: none; border-radius: 4px; background-color: #1e1e1e; color: white; font-size: 16px; outline: none; }
+        button { padding: 12px 20px; margin-left: 10px; border: none; border-radius: 4px; background-color: #007acc; color: white; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #005f9e; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        .system-msg { align-self: center; font-size: 12px; color: #888; margin: 5px 0; }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="header">
+        SHL Assessment Recommender
+        <div class="status"><div class="status-dot"></div>API Ready</div>
+    </div>
+    <div class="chat-box" id="chat-box">
+        <div class="message agent">Hi! I can help you find the right SHL assessment. What kind of role are you hiring for?</div>
+    </div>
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off">
+        <button id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = "/chat"; // Relative path!
+    let conversationHistory = [];
+    
+    const chatBox = document.getElementById("chat-box");
+    const userInput = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
+
+    userInput.addEventListener("keypress", function(event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    function addMessageToUI(role, content, recommendations = [], isEnd = false) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `message ${role}`;
+        msgDiv.innerText = content;
+
+        if (recommendations && recommendations.length > 0) {
+            const recDiv = document.createElement("div");
+            recDiv.className = "recommendations";
+            let html = `<strong>Shortlist (${recommendations.length}):</strong><br>`;
+            recommendations.forEach((rec, idx) => {
+                html += `<div class="rec-item">${idx + 1}. <a href="${rec.url}" target="_blank">${rec.name}</a> [Type: ${rec.test_type}]</div>`;
+            });
+            recDiv.innerHTML = html;
+            msgDiv.appendChild(recDiv);
+        }
+
+        chatBox.appendChild(msgDiv);
+
+        if (isEnd) {
+            const endMsg = document.createElement("div");
+            endMsg.className = "system-msg";
+            endMsg.innerText = "--- Agent ended the conversation ---";
+            chatBox.appendChild(endMsg);
+        }
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        addMessageToUI("user", text);
+        conversationHistory.push({ role: "user", content: text });
+        
+        userInput.value = "";
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        sendBtn.innerText = "Thinking...";
+
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: conversationHistory })
+            });
+
+            if (!response.ok) throw new Error("API request failed.");
+            
+            const data = await response.json();
+            conversationHistory.push({ role: "assistant", content: data.reply });
+            addMessageToUI("agent", data.reply, data.recommendations, data.end_of_conversation);
+
+        } catch (error) {
+            console.error(error);
+            addMessageToUI("agent", "Error: Could not reach the API.");
+        } finally {
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            sendBtn.innerText = "Send";
+            userInput.focus();
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Literal, Optional
+from typing import List, Literal
 
 class Message(BaseModel):
     role: Literal["user", "assistant", "system"]
